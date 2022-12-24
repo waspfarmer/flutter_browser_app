@@ -2,6 +2,7 @@ import 'package:collection/collection.dart';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_browser/utils/enforce_safe_search.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 class WebViewModel extends ChangeNotifier {
@@ -56,6 +57,11 @@ class WebViewModel extends ChangeNotifier {
     _loadedResources = loadedResources ?? <LoadedResource>[];
     _isSecure = isSecure;
     settings = settings ?? InAppWebViewSettings();
+
+    if(_url!=null) {
+      WebUri? safeSearchUri = updateWithSafeSearch(_url!);
+      _url = (safeSearchUri!=null)?safeSearchUri:_url;
+    }
   }
 
   int? get tabIndex => _tabIndex;

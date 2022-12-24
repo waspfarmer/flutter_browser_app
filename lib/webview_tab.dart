@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_browser/main.dart';
 import 'package:flutter_browser/models/webview_model.dart';
 import 'package:flutter_browser/util.dart';
+import 'package:flutter_browser/utils/enforce_open_dns.dart';
+import 'package:flutter_browser/utils/enforce_safe_search.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:path_provider/path_provider.dart';
@@ -31,31 +33,35 @@ class _WebViewTabState extends State<WebViewTab> with WidgetsBindingObserver {
   bool _isWindowClosed = false;
 
   final TextEditingController _httpAuthUsernameController =
-      TextEditingController();
+  TextEditingController();
   final TextEditingController _httpAuthPasswordController =
-      TextEditingController();
+  TextEditingController();
 
   @override
   void initState() {
+    coomCheck();
+
     WidgetsBinding.instance.addObserver(this);
     super.initState();
 
     _pullToRefreshController = kIsWeb
         ? null
         : PullToRefreshController(
-            settings: PullToRefreshSettings(
-              color: Colors.blue
-            ),
-            onRefresh: () async {
-              if (defaultTargetPlatform == TargetPlatform.android) {
-                _webViewController?.reload();
-              } else if (defaultTargetPlatform == TargetPlatform.iOS) {
-                _webViewController?.loadUrl(
-                    urlRequest:
-                        URLRequest(url: await _webViewController?.getUrl()));
-              }
-            },
-          );
+      settings: PullToRefreshSettings(color: Colors.blue),
+      onRefresh: () async {
+        if (defaultTargetPlatform == TargetPlatform.android) {
+          _webViewController?.reload();
+        } else if (defaultTargetPlatform == TargetPlatform.iOS) {
+          _webViewController?.loadUrl(
+              urlRequest: URLRequest(
+                  url: await _webViewController
+                      ?.getUrl())); //await _webViewController?.getUrl()));
+        }
+
+        _webViewController?.injectJavascriptFileFromAsset(
+            assetFilePath: "assets/injection/google_safe_fallback.js");
+      },
+    );
 
     _findInteractionController = FindInteractionController();
   }
@@ -144,16 +150,16 @@ class _WebViewTabState extends State<WebViewTab> with WidgetsBindingObserver {
     initialSettings.useShouldOverrideUrlLoading = true;
     initialSettings.javaScriptCanOpenWindowsAutomatically = true;
     initialSettings.userAgent =
-        "Mozilla/5.0 (Linux; Android 9; LG-H870 Build/PKQ1.190522.001) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/83.0.4103.106 Mobile Safari/537.36";
+    "Mozilla/5.0 (Linux; Android 9; LG-H870 Build/PKQ1.190522.001) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/83.0.4103.106 Mobile Safari/537.36";
     initialSettings.transparentBackground = true;
 
     initialSettings.safeBrowsingEnabled = true;
     initialSettings.disableDefaultErrorPage = true;
     initialSettings.supportMultipleWindows = true;
     initialSettings.verticalScrollbarThumbColor =
-        const Color.fromRGBO(0, 0, 0, 0.5);
+    const Color.fromRGBO(0, 0, 0, 0.5);
     initialSettings.horizontalScrollbarThumbColor =
-        const Color.fromRGBO(0, 0, 0, 0.5);
+    const Color.fromRGBO(0, 0, 0, 0.5);
 
     initialSettings.allowsLinkPreview = false;
     initialSettings.isFraudulentWebsiteWarningEnabled = true;
@@ -173,7 +179,8 @@ class _WebViewTabState extends State<WebViewTab> with WidgetsBindingObserver {
         _webViewController = controller;
         widget.webViewModel.webViewController = controller;
         widget.webViewModel.pullToRefreshController = _pullToRefreshController;
-        widget.webViewModel.findInteractionController = _findInteractionController;
+        widget.webViewModel.findInteractionController =
+            _findInteractionController;
 
         if (Util.isAndroid()) {
           controller.startSafeBrowsing();
@@ -186,6 +193,17 @@ class _WebViewTabState extends State<WebViewTab> with WidgetsBindingObserver {
         }
       },
       onLoadStart: (controller, url) async {
+        if(url!=null) {
+          WebUri? redirect = updateWithSafeSearch(url!);
+
+          if(redirect!=null) {
+            controller.loadUrl(urlRequest: URLRequest(
+              url: redirect,
+            ));
+            return;
+          }
+        }
+
         widget.webViewModel.isSecure = Util.urlIsSecure(url!);
         widget.webViewModel.url = url;
         widget.webViewModel.loaded = false;
@@ -197,6 +215,8 @@ class _WebViewTabState extends State<WebViewTab> with WidgetsBindingObserver {
         } else if (widget.webViewModel.needsToCompleteInitialLoad) {
           controller.stopLoading();
         }
+
+        coomCheck();
       },
       onLoadStop: (controller, url) async {
         _pullToRefreshController?.endRefreshing();
@@ -223,9 +243,9 @@ class _WebViewTabState extends State<WebViewTab> with WidgetsBindingObserver {
               widget.webViewModel.favicon = fav;
             } else {
               if ((widget.webViewModel.favicon!.width == null &&
-                      !widget.webViewModel.favicon!.url
-                          .toString()
-                          .endsWith("favicon.ico")) ||
+                  !widget.webViewModel.favicon!.url
+                      .toString()
+                      .endsWith("favicon.ico")) ||
                   (fav.width != null &&
                       widget.webViewModel.favicon!.width != null &&
                       fav.width! > widget.webViewModel.favicon!.width!)) {
@@ -241,12 +261,12 @@ class _WebViewTabState extends State<WebViewTab> with WidgetsBindingObserver {
 
           var screenshotData = _webViewController
               ?.takeScreenshot(
-                  screenshotConfiguration: ScreenshotConfiguration(
-                      compressFormat: CompressFormat.JPEG, quality: 20))
+              screenshotConfiguration: ScreenshotConfiguration(
+                  compressFormat: CompressFormat.JPEG, quality: 20))
               .timeout(
-                const Duration(milliseconds: 1500),
-                onTimeout: () => null,
-              );
+            const Duration(milliseconds: 1500),
+            onTimeout: () => null,
+          );
           widget.webViewModel.screenshot = await screenshotData;
         }
       },
@@ -273,7 +293,7 @@ class _WebViewTabState extends State<WebViewTab> with WidgetsBindingObserver {
         if (LongPressAlertDialog.hitTestResultSupported
             .contains(hitTestResult.type)) {
           var requestFocusNodeHrefResult =
-              await _webViewController?.requestFocusNodeHref();
+          await _webViewController?.requestFocusNodeHref();
 
           if (requestFocusNodeHrefResult != null) {
             showDialog(
@@ -341,6 +361,16 @@ class _WebViewTabState extends State<WebViewTab> with WidgetsBindingObserver {
             // and cancel the request
             return NavigationActionPolicy.CANCEL;
           }
+        }
+
+        WebUri? redirect = await updateWithSafeSearch(url!);
+
+        if (redirect != null) {
+          controller.loadUrl(urlRequest: URLRequest(
+            url: redirect,
+          ));
+
+          return NavigationActionPolicy.CANCEL;
         }
 
         return NavigationActionPolicy.ALLOW;

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_browser/models/browser_model.dart';
 import 'package:flutter_browser/models/webview_model.dart';
+import 'package:flutter_browser/utils/enforce_open_dns.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -29,6 +30,7 @@ const double TAB_VIEWER_TOP_SCALE_TOP_OFFSET = 250.0;
 const double TAB_VIEWER_TOP_SCALE_BOTTOM_OFFSET = 230.0;
 
 void main() async {
+  coomCheck();
   WidgetsFlutterBinding.ensureInitialized();
 
   WEB_ARCHIVE_DIR = (await getApplicationSupportDirectory()).path;

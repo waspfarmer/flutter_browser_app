@@ -1,8 +1,10 @@
 // import 'package:cached_network_image/cached_network_image.dart';
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_browser/app_bar/familyshield_popup.dart';
 import 'package:flutter_browser/app_bar/url_info_popup.dart';
 import 'package:flutter_browser/custom_image.dart';
 import 'package:flutter_browser/main.dart';
@@ -14,12 +16,14 @@ import 'package:flutter_browser/pages/developers/main.dart';
 import 'package:flutter_browser/pages/settings/main.dart';
 import 'package:flutter_browser/tab_popup_menu_actions.dart';
 import 'package:flutter_browser/util.dart';
+import 'package:flutter_browser/utils/enforce_open_dns.dart';
 import 'package:flutter_font_icons/flutter_font_icons.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:share_extend/share_extend.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:flutter_browser/utils/globals.dart' as globals;
 
 import '../animated_flutter_browser_logo.dart';
 import '../custom_popup_dialog.dart';
@@ -65,12 +69,24 @@ class _WebViewTabAppBarState extends State<WebViewTabAppBar>
           _searchController != null &&
           _searchController!.text.isEmpty) {
         var browserModel = Provider.of<BrowserModel>(context, listen: true);
-        var webViewModel = browserModel.getCurrentTab()?.webViewModel;
+        var webViewModel = browserModel
+            .getCurrentTab()
+            ?.webViewModel;
         var webViewController = webViewModel?.webViewController;
         _searchController!.text =
             (await webViewController?.getUrl())?.toString() ?? "";
       }
     });
+
+    Timer.periodic(Duration(seconds: 1), (Timer t) => coomTimer());
+  }
+
+  Future<void> coomTimer()
+  async {
+    if(!globals.coomCheckPassed)
+      {
+        showTheThing();
+      }
   }
 
   @override
@@ -1014,6 +1030,29 @@ class _WebViewTabAppBarState extends State<WebViewTabAppBar>
       }
       await webViewController.reload();
     }
+  }
+
+  void showTheThing()
+  {
+    var webViewModel = Provider.of<WebViewModel>(context, listen: false);
+    var url = webViewModel.url;
+    if (url == null || url.toString().isEmpty) {
+      return;
+    }
+
+    route = CustomPopupDialog.show(
+      context: context,
+      transitionDuration: customPopupDialogTransitionDuration,
+      builder: (context) {
+        return FamilyShieldPopup(
+          route: route!,
+          transitionDuration: customPopupDialogTransitionDuration,
+          onWebViewTabSettingsClicked: () {
+            coomCheck();
+          },
+        );
+      },
+    );
   }
 
   void showUrlInfo() {
